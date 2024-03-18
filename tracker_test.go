@@ -51,8 +51,9 @@ func createFile(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to create a file %v", err)
 	}
-	defer f.Close()
-	os.Remove(f.Name())
+	f.Close()
+	err = os.Remove(f.Name())
+	t.Log(err)
 }
 
 func createEnv(t *testing.T, passOn fsnotify.Op) (*Tracker, *testObserver) {
@@ -85,6 +86,7 @@ func createFolder(t *testing.T) {
 	if err != nil {
 		t.Errorf("failed to create a file %v", err)
 	}
+
 	os.Remove(n)
 }
 
@@ -101,12 +103,13 @@ func writeToFile(t *testing.T) {
 		t.Errorf("failed to create a temporary file for writing")
 		return
 	}
-	defer f.Close()
+	
 	_, err = io.Copy(f, strRead)
 	if err != nil {
 		t.Errorf("failed to write to file")
 		return
 	}
+	f.Close()
 	os.Remove(f.Name())
 }
 
@@ -116,14 +119,17 @@ func renameFile(t *testing.T) {
 		t.Errorf("failed to create a file %v", err)
 		return
 	}
-	defer f.Close()
+	f.Close()
 	newName := path.Join(toMonit, "renamed.txt")
 	err = os.Rename(f.Name(), newName)
 	if err != nil {
+		t.Log(err)
 		t.Errorf("failed to rename")
 		return
 	}
+	
 	os.Remove(newName)
+	
 }
 func testRunner(o *testObserver, t *testing.T, toRun func(*testing.T), waitBeforeFail int) {
 

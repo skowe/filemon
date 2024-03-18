@@ -22,10 +22,10 @@ type testObserver struct {
 func (t *testObserver) Update(event *Event) {
 
 	if event.IsError() {
-		t.test.Errorf("failed test: %v", event.err)
+		t.test.Errorf("failed test: %v", event.Err)
 		return
 	}
-	if !event.event.Has(t.passOnOp) {
+	if !event.Event.Has(t.passOnOp) {
 		return
 	}
 	t.test.Log("passed")

@@ -83,15 +83,17 @@ func (t *Tracker) Run() {
 		select {
 		case ev := <-t.watcher.Events:
 			e := Event{
-				err:       nil,
-				event:     ev,
-				timestamp: time.Now(),
+				Name: ev.Name,
+				Op: ev.Op,
+				Err:       nil,
+				Event:     ev,
+				Timestamp: time.Now(),
 			}
 			t.NotifyAll(e)
 		case err := <-t.watcher.Errors:
 			e := Event{
-				err:       err,
-				timestamp: time.Now(),
+				Err:       err,
+				Timestamp: time.Now(),
 			}
 			t.NotifyAll(e)
 		}

@@ -25,6 +25,7 @@ type Observer interface {
 type Tracker struct {
 	watcher   *fsnotify.Watcher
 	observers map[string]Observer
+	stop      chan int
 }
 
 func New() (*Tracker, error) {
@@ -36,11 +37,15 @@ func New() (*Tracker, error) {
 		return nil, err
 	}
 	res.addWatcher(w)
+	res.stopper()
 	return res, nil
 }
 
 func (t *Tracker) addWatcher(w *fsnotify.Watcher) {
 	t.watcher = w
+}
+func (t *Tracker) stopper() {
+	t.stop = make(chan int)
 }
 
 func (t *Tracker) Register(o Observer) error {
@@ -76,15 +81,17 @@ func (t *Tracker) NotifyAll(event Event) {
 func (t *Tracker) Add(path string) error {
 	return t.watcher.Add(path)
 }
-
+func (t *Tracker) Stop() {
+	close(t.stop)
+}
 func (t *Tracker) Run() {
 
 	for {
 		select {
 		case ev := <-t.watcher.Events:
 			e := Event{
-				Name: ev.Name,
-				Op: ev.Op,
+				Name:      ev.Name,
+				Op:        ev.Op,
 				Err:       nil,
 				Event:     ev,
 				Timestamp: time.Now(),
@@ -96,6 +103,16 @@ func (t *Tracker) Run() {
 				Timestamp: time.Now(),
 			}
 			t.NotifyAll(e)
+		case <-t.stop:
+			err := t.watcher.Close()
+			if err != nil {
+				e := Event{
+					Err:       err,
+					Timestamp: time.Now(),
+				}
+				t.NotifyAll(e)
+			}
+			return
 		}
 	}
 }

@@ -26,7 +26,7 @@ type Tracker struct {
 	watcher   *fsnotify.Watcher
 	observers map[string]Observer
 	stop      chan int
-	Events chan Event
+	Events    chan Event
 }
 
 func New() (*Tracker, error) {
@@ -35,7 +35,7 @@ func New() (*Tracker, error) {
 	res.observers = make(map[string]Observer)
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("New failed to create a tracker %w", err)
 	}
 	res.addWatcher(w)
 	res.stopper()

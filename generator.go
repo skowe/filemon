@@ -2,6 +2,7 @@ package filemon
 
 import (
 	"crypto/rand"
+	"fmt"
 	gen "math/rand"
 )
 
@@ -17,7 +18,8 @@ func GenerateString() (string, error) {
 	// Write random byte values into the bytearray
 	_, err := rand.Read(b)
 	if err != nil {
-		return "", err
+
+		return "", fmt.Errorf("GenerateString failed to do so: %w", err)
 	}
 	for i := range b {
 		b[i] = source[int(b[i])%len(source)]

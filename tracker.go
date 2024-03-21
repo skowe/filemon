@@ -82,7 +82,11 @@ func (t *Tracker) NotifyAll(event Event) {
 }
 
 func (t *Tracker) Add(path string) error {
-	return t.watcher.Add(path)
+	err := t.watcher.Add(path)
+	if err != nil {
+		return fmt.Errorf("Tracker.Add failed to add path to tracker: %w", err)
+	}
+	return nil
 }
 func (t *Tracker) Stop() {
 	close(t.stop)

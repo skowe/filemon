@@ -12,39 +12,68 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-type testObserver struct {
-	passOnOp fsnotify.Op
-	tag      string
-	test     *testing.T
-	Pass     chan int
+type testWorker struct {
+	passOnOp uint32
+	t        *testing.T
+	canWork  bool
 }
 
-func (t *testObserver) Update(event *Event) {
-
-	if event.IsError() {
-		t.test.Errorf("failed test: %v", event.Err)
-		return
+func (t *testWorker) Open(e *Event) Worker {
+	t.canWork = e.Has(t.passOnOp)
+	return Worker(t)
+}
+func (t *testWorker) Work() bool {
+	if !t.canWork {
+		return false
 	}
-	if !event.Event.Has(t.passOnOp) {
-		return
-	}
-	t.test.Log("passed")
-	t.Pass <- 1
-}
-
-func (t *testObserver) Tag(s string) {
-	t.tag = s
-}
-
-func (t *testObserver) GetTag() string {
-	return t.tag
+	t.t.Log("Got ", fsnotify.Op(t.passOnOp).String())
+	Pass <- 1
+	return true
 }
 
 var (
 	ErrTestOutOfTime = fmt.Errorf("test out of time")
+
+	// testWorker will send a pass signal if it ever comes to it
+	Pass = make(chan int)
 )
 
 const toMonit = "to_monit"
+
+func createTester(t *testing.T, passOn uint32) func() Worker {
+	tw := &testWorker{
+		passOnOp: passOn,
+		t:        t,
+		canWork:  false,
+	}
+	return func() Worker {
+		return Worker(tw)
+	}
+}
+
+func createEnv(t *testing.T, passOn uint32, workerWaits bool) *Tracker {
+	os.Mkdir(toMonit, 0744)
+	toTest, err := New()
+
+	if err != nil {
+		t.Errorf("failed to init test: monitor creation fail %v", err)
+		return nil
+	}
+	err = toTest.Add(toMonit)
+	if err != nil {
+		t.Errorf("failed to assign folder to monitor %v", err)
+		return nil
+	}
+	spawner := createTester(t, passOn)
+	freeOnCompletion := true
+	to := NewReciever(toMonit, workerWaits, freeOnCompletion, spawner)
+	err = toTest.Register(to)
+	if err != nil {
+		t.Errorf("failed to register observer to the monitor: %v", err)
+		return nil
+	}
+	return toTest
+}
 
 func createFile(t *testing.T) {
 	f, err := os.CreateTemp(toMonit, "test.txt")
@@ -52,33 +81,7 @@ func createFile(t *testing.T) {
 		t.Errorf("failed to create a file %v", err)
 	}
 	f.Close()
-	err = os.Remove(f.Name())
-	t.Log(err)
-}
-
-func createEnv(t *testing.T, passOn fsnotify.Op) (*Tracker, *testObserver) {
-	toTest, err := New()
-	if err != nil {
-		t.Errorf("failed to init test: monitor creation fail")
-		return nil, nil
-	}
-	err = toTest.Add(toMonit)
-	if err != nil {
-		t.Errorf("failed to assign folder to monitor")
-		return nil, nil
-	}
-	to := &testObserver{
-		Pass:     make(chan int),
-		test:     t,
-		passOnOp: passOn,
-	}
-
-	err = toTest.Register(to)
-	if err != nil {
-		t.Error("failed to register observer to the monitor")
-		return nil, nil
-	}
-	return toTest, to
+	os.Remove(f.Name())
 }
 
 func createFolder(t *testing.T) {
@@ -103,7 +106,7 @@ func writeToFile(t *testing.T) {
 		t.Errorf("failed to create a temporary file for writing")
 		return
 	}
-	
+
 	_, err = io.Copy(f, strRead)
 	if err != nil {
 		t.Errorf("failed to write to file")
@@ -127,11 +130,11 @@ func renameFile(t *testing.T) {
 		t.Errorf("failed to rename")
 		return
 	}
-	
+
 	os.Remove(newName)
-	
+
 }
-func testRunner(o *testObserver, t *testing.T, toRun func(*testing.T), waitBeforeFail int) {
+func testRunner(t *testing.T, toRun func(*testing.T), waitBeforeFail int) {
 
 	go toRun(t)
 
@@ -140,59 +143,58 @@ func testRunner(o *testObserver, t *testing.T, toRun func(*testing.T), waitBefor
 	case <-ticker.C:
 		ticker.Stop()
 		t.Errorf("%v", ErrTestOutOfTime)
-	case <-o.Pass:
+	case <-Pass:
 		ticker.Stop()
-		t.Log("Got to pass")
+		// Ticker is here to help sync with execution
+		// call to log on t.Log in Work may sometimes finish after testRunner is done causing a panic
+		tocker := time.NewTicker(300 * time.Millisecond)
+		<-tocker.C
 		return
 	}
 }
 func TestCreateFile(t *testing.T) {
-	toTest, to := createEnv(t, fsnotify.Create)
-	go func(){ for ev := range toTest.Events {
-		t.Log(ev)
-	}}()
-
+	toTest := createEnv(t, CREATE, false)
 
 	go toTest.Run()
-	testRunner(to, t, createFile, 5)
+	testRunner(t, createFile, 5)
+	os.Remove(toMonit)
 }
 
 func TestRemoveFile(t *testing.T) {
-	toTest, to := createEnv(t, fsnotify.Remove)
-	go func(){ for ev := range toTest.Events {
-		t.Log(ev)
-	}}()
-	go toTest.Run()
-	testRunner(to, t, createFile, 5)
-}
-func TestCreateFolder(t *testing.T) {
-	toTest, to := createEnv(t, fsnotify.Create)
-	go func(){ for ev := range toTest.Events {
-		t.Log(ev)
-	}}()
+	toTest := createEnv(t, REMOVE, false)
 
 	go toTest.Run()
-	testRunner(to, t, createFolder, 5)
+	testRunner(t, createFile, 5)
+	os.Remove(toMonit)
+}
+func TestCreateFolder(t *testing.T) {
+	toTest := createEnv(t, CREATE, false)
+
+	go toTest.Run()
+	testRunner(t, createFolder, 5)
+	os.Remove(toMonit)
 }
 
 func TestWriteFile(t *testing.T) {
-	toTest, to := createEnv(t, fsnotify.Write)
-	go func(){ for ev := range toTest.Events {
-		t.Log(ev)
-	}}()
-
+	toTest := createEnv(t, WRITE, false)
 
 	go toTest.Run()
-	testRunner(to, t, writeToFile, 5)
+	testRunner(t, writeToFile, 5)
+	os.Remove(toMonit)
 }
 
 func TestRename(t *testing.T) {
-	toTest, to := createEnv(t, fsnotify.Rename)
-	go func(){ for ev := range toTest.Events {
-		t.Log(ev)
-	}}()
-
+	toTest := createEnv(t, RENAME, false)
 
 	go toTest.Run()
-	testRunner(to, t, renameFile, 5)
+	testRunner(t, renameFile, 5)
+	os.Remove(toMonit)
+}
+
+func TestWaitingWorker(t *testing.T) {
+	toTest := createEnv(t, REMOVE, true)
+
+	go toTest.Run()
+	testRunner(t, writeToFile, 5)
+	os.Remove(toMonit)
 }

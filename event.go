@@ -7,12 +7,25 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
+// Transaltions of original fsnotify events to uint32, implemented for ease of use
+const (
+	CREATE uint32 = 1 << iota
+	WRITE
+	REMOVE
+	RENAME
+	CHMOD
+)
+
 type Event struct {
-	Name string
-	Op fsnotify.Op
+	Name      string
+	Op        fsnotify.Op
 	Event     fsnotify.Event
 	Timestamp time.Time
 	Err       error
+}
+
+func (e *Event) Has(op uint32) bool {
+	return e.Op.Has(fsnotify.Op(op))
 }
 
 func (e *Event) String() string {

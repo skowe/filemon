@@ -148,29 +148,51 @@ func testRunner(o *testObserver, t *testing.T, toRun func(*testing.T), waitBefor
 }
 func TestCreateFile(t *testing.T) {
 	toTest, to := createEnv(t, fsnotify.Create)
+	go func(){ for ev := range toTest.Events {
+		t.Log(ev)
+	}}()
+
+
 	go toTest.Run()
 	testRunner(to, t, createFile, 5)
 }
 
 func TestRemoveFile(t *testing.T) {
 	toTest, to := createEnv(t, fsnotify.Remove)
+	go func(){ for ev := range toTest.Events {
+		t.Log(ev)
+	}}()
 	go toTest.Run()
 	testRunner(to, t, createFile, 5)
 }
 func TestCreateFolder(t *testing.T) {
 	toTest, to := createEnv(t, fsnotify.Create)
+	go func(){ for ev := range toTest.Events {
+		t.Log(ev)
+	}}()
+
 	go toTest.Run()
 	testRunner(to, t, createFolder, 5)
 }
 
 func TestWriteFile(t *testing.T) {
 	toTest, to := createEnv(t, fsnotify.Write)
+	go func(){ for ev := range toTest.Events {
+		t.Log(ev)
+	}}()
+
+
 	go toTest.Run()
 	testRunner(to, t, writeToFile, 5)
 }
 
 func TestRename(t *testing.T) {
 	toTest, to := createEnv(t, fsnotify.Rename)
+	go func(){ for ev := range toTest.Events {
+		t.Log(ev)
+	}}()
+
+
 	go toTest.Run()
 	testRunner(to, t, renameFile, 5)
 }

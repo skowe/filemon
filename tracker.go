@@ -26,6 +26,7 @@ type Tracker struct {
 	watcher   *fsnotify.Watcher
 	observers map[string]Observer
 	stop      chan int
+	Events chan Event
 }
 
 func New() (*Tracker, error) {
@@ -38,6 +39,7 @@ func New() (*Tracker, error) {
 	}
 	res.addWatcher(w)
 	res.stopper()
+	res.Events = make(chan Event)
 	return res, nil
 }
 
@@ -76,6 +78,7 @@ func (t *Tracker) NotifyAll(event Event) {
 	for _, o := range t.observers {
 		o.Update(&event)
 	}
+	t.Events <- event
 }
 
 func (t *Tracker) Add(path string) error {

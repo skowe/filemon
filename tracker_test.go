@@ -54,7 +54,8 @@ func createTester(t *testing.T, passOn uint32) func() Worker {
 
 func createEnv(t *testing.T, passOn uint32, workerWaits bool) *Tracker {
 	os.Mkdir(toMonit, 0744)
-	toTest, err := New()
+	logger := log.New(os.Stderr, "ERROR", log.Ldate|log.Ltime)
+	toTest, err := New(logger)
 
 	if err != nil {
 		t.Errorf("failed to init test: monitor creation fail %v", err)
@@ -67,7 +68,6 @@ func createEnv(t *testing.T, passOn uint32, workerWaits bool) *Tracker {
 	}
 	spawner := createTester(t, passOn)
 	freeOnCompletion := true
-	logger := log.New(os.Stderr, "ERROR", log.Ldate|log.Ltime)
 
 	to := NewReciever(toMonit, workerWaits, freeOnCompletion, logger, spawner)
 	err = toTest.Register(to)

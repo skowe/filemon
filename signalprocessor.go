@@ -3,10 +3,12 @@ package filemon
 import (
 	"errors"
 	"log"
+	"path/filepath"
 )
 
 var (
 	ErrorLoggerCantbeNil = errors.New("SignalReciever object must be passed a logger object")
+	ErrorCantWork        = errors.New("Worker.Work: can't work waiting for signal")
 )
 
 type Worker interface {
@@ -26,26 +28,31 @@ type SignalReciever struct {
 }
 
 func (s *SignalReciever) Update(e *Event) {
+	// log.Println(e.Name, s.watching)
+	if s.watching != filepath.Dir(e.Name) {
+		return
+	}
 	if !s.isTrigger {
-		worker := s.spawner().Open(e)
+		worker := s.spawner()
+		worker.Open(e)
 		worker.Work()
 		return
 	}
-	_, ok := s.waitingWorkers[e.Name]
+	worker, ok := s.waitingWorkers[e.Name]
 	if !ok {
 		s.waitingWorkers[e.Name] = s.spawner()
+		s.waitingWorkers[e.Name].Open(e)
 		return
 	}
 
-	s.waitingWorkers[e.Name].Open(e)
-	err := s.waitingWorkers[e.Name].Work()
-	if err != nil {
+	worker.Open(e)
+	err := worker.Work()
+
+	if err != nil && !errors.Is(err, ErrorCantWork) {
+		log.Println(err)
+
 		s.logger.Printf("SignalReciever.Update: Failed to execute worker for %s, %s", e.Name, err)
 	}
-	if s.freeOnCompletion {
-		delete(s.waitingWorkers, e.Name)
-	}
-
 }
 
 func (s *SignalReciever) Tag(tag string) {

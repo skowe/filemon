@@ -2,6 +2,7 @@ package filemon
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -26,9 +27,10 @@ type Tracker struct {
 	watcher   *fsnotify.Watcher
 	observers map[string]Observer
 	stop      chan int
+	logger    *log.Logger
 }
 
-func New() (*Tracker, error) {
+func New(logger *log.Logger) (*Tracker, error) {
 	res := new(Tracker)
 
 	res.observers = make(map[string]Observer)
@@ -38,12 +40,14 @@ func New() (*Tracker, error) {
 	}
 	res.addWatcher(w)
 	res.stopper()
+	res.logger = logger
 	return res, nil
 }
 
 func (t *Tracker) addWatcher(w *fsnotify.Watcher) {
 	t.watcher = w
 }
+
 func (t *Tracker) stopper() {
 	t.stop = make(chan int)
 }
@@ -94,6 +98,7 @@ func (t *Tracker) Run() {
 	for {
 		select {
 		case ev := <-t.watcher.Events:
+			t.logger.Println(ev)
 			e := Event{
 				Name:      ev.Name,
 				Op:        ev.Op,
@@ -103,6 +108,7 @@ func (t *Tracker) Run() {
 			}
 			t.NotifyAll(e)
 		case err := <-t.watcher.Errors:
+			t.logger.Println(err)
 			e := Event{
 				Err:       err,
 				Timestamp: time.Now(),

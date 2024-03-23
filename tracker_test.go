@@ -3,6 +3,7 @@ package filemon
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path"
 	"strings"
@@ -22,13 +23,13 @@ func (t *testWorker) Open(e *Event) Worker {
 	t.canWork = e.Has(t.passOnOp)
 	return Worker(t)
 }
-func (t *testWorker) Work() bool {
+func (t *testWorker) Work() error {
 	if !t.canWork {
-		return false
+		return nil
 	}
 	t.t.Log("Got ", fsnotify.Op(t.passOnOp).String())
 	Pass <- 1
-	return true
+	return nil
 }
 
 var (
@@ -66,7 +67,9 @@ func createEnv(t *testing.T, passOn uint32, workerWaits bool) *Tracker {
 	}
 	spawner := createTester(t, passOn)
 	freeOnCompletion := true
-	to := NewReciever(toMonit, workerWaits, freeOnCompletion, spawner)
+	logger := log.New(os.Stderr, "ERROR", log.Ldate|log.Ltime)
+
+	to := NewReciever(toMonit, workerWaits, freeOnCompletion, logger, spawner)
 	err = toTest.Register(to)
 	if err != nil {
 		t.Errorf("failed to register observer to the monitor: %v", err)

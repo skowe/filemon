@@ -40,7 +40,7 @@ func (s *SignalReciever) Update(e *Event) {
 	s.waitingWorkers[e.Name].Open(e)
 	err := s.waitingWorkers[e.Name].Work()
 	if err != nil {
-		log.Printf("SignalReciever.Update: Failed to execute worker for %s, %s", e.Name, err)
+		s.logger.Printf("SignalReciever.Update: Failed to execute worker for %s, %s", e.Name, err)
 	}
 	if s.freeOnCompletion {
 		delete(s.waitingWorkers, e.Name)

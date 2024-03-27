@@ -24,9 +24,12 @@ func (t *testWorker) Open(e *Event) Worker {
 	return Worker(t)
 }
 func (t *testWorker) Work() error {
+	t.t.Log("In Worker")
 	if !t.canWork {
+		t.t.Log("Failing Worker")
 		return nil
 	}
+	t.t.Log("Passing Worker")
 	t.t.Log("Got ", fsnotify.Op(t.passOnOp).String())
 	Pass <- 1
 	return nil
@@ -148,7 +151,7 @@ func testRunner(t *testing.T, toRun func(*testing.T), waitBeforeFail int) {
 		t.Errorf("%v", ErrTestOutOfTime)
 	case <-Pass:
 		ticker.Stop()
-		// Ticker is here to help sync with execution
+		// tocker is here to help sync with execution
 		// call to log on t.Log in Work may sometimes finish after testRunner is done causing a panic
 		tocker := time.NewTicker(300 * time.Millisecond)
 		<-tocker.C
@@ -160,7 +163,6 @@ func TestCreateFile(t *testing.T) {
 
 	go toTest.Run()
 	testRunner(t, createFile, 5)
-	os.Remove(toMonit)
 }
 
 func TestRemoveFile(t *testing.T) {
@@ -168,14 +170,12 @@ func TestRemoveFile(t *testing.T) {
 
 	go toTest.Run()
 	testRunner(t, createFile, 5)
-	os.Remove(toMonit)
 }
 func TestCreateFolder(t *testing.T) {
 	toTest := createEnv(t, CREATE, false)
 
 	go toTest.Run()
 	testRunner(t, createFolder, 5)
-	os.Remove(toMonit)
 }
 
 func TestWriteFile(t *testing.T) {
@@ -183,7 +183,6 @@ func TestWriteFile(t *testing.T) {
 
 	go toTest.Run()
 	testRunner(t, writeToFile, 5)
-	os.Remove(toMonit)
 }
 
 func TestRename(t *testing.T) {
@@ -191,7 +190,6 @@ func TestRename(t *testing.T) {
 
 	go toTest.Run()
 	testRunner(t, renameFile, 5)
-	os.Remove(toMonit)
 }
 
 func TestWaitingWorker(t *testing.T) {
